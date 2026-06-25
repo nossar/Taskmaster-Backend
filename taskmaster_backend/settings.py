@@ -10,22 +10,48 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
+from pydantic import Field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
+
+
+class AppSettings(BaseSettings):
+    # Validation: Automatically looks for SECRET_KEY in environment
+    SECRET_KEY: SecretStr = Field(...)
+    DEBUG: bool = False
+    ALLOWED_HOSTS: list[str] = Field(...)
+    DATABASE_URL: SecretStr | None = Field(...)
+    DEFAULT_FROM_EMAIL: str = "no-reply@taskmaster.local"
+    RESEND_API_KEY: SecretStr | None = None
+    CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=list)
+
+    model_config = SettingsConfigDict(env_file=".env")
+
+
+# Instantiate the settings
+config = AppSettings()
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-v(hzrentwo0)0@_$47j&2c%^ww%%17i#1x3l=4zc&amowoaf&p"
+SECRET_KEY = config.SECRET_KEY.get_secret_value()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config.DEBUG
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config.ALLOWED_HOSTS
 
 
 # Application definition
@@ -38,9 +64,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "corsheaders",
+    "anymail",
     "tasks",
+    "users",
 ]
 
 MIDDLEWARE = [
@@ -77,12 +106,24 @@ WSGI_APPLICATION = "taskmaster_backend.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+_database_url = (
+    config.DATABASE_URL.get_secret_value().strip() if config.DATABASE_URL else ""
+)
+if _database_url:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            _database_url,
+            conn_max_age=0,
+            ssl_require=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation
@@ -137,7 +178,72 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
 }
 
-CORS_ALLOW_ALL_ORIGINS = True  # ok para dev; restrinja na publicação
+# CORS: em dev libera tudo; em produção exige lista explícita de origens permitidas.
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = config.CORS_ALLOWED_ORIGINS
+    if not CORS_ALLOWED_ORIGINS:
+        raise ImproperlyConfigured(
+            "CORS_ALLOWED_ORIGINS must be set when DEBUG is false."
+        )
 
-ALLOWED_HOSTS = ["*"]  # ok para dev no Codespaces; restrinja na publicação
 CSRF_TRUSTED_ORIGINS = ["https://*.app.github.dev"]
+
+# E-mail (recuperação de senha)
+# https://docs.djangoproject.com/en/6.0/topics/email/
+
+DEFAULT_FROM_EMAIL = config.DEFAULT_FROM_EMAIL
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    _resend_api_key = (
+        config.RESEND_API_KEY.get_secret_value().strip()
+        if config.RESEND_API_KEY
+        else ""
+    )
+    if not _resend_api_key:
+        raise ImproperlyConfigured("RESEND_API_KEY must be set when DEBUG is false.")
+
+    EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+    ANYMAIL = {
+        "RESEND_API_KEY": _resend_api_key,
+    }
+
+# URL do frontend usada para montar o link enviado no e-mail de redefinição de senha.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "ERROR",  # Or 'DEBUG' temporarily to see everything
+            "propagate": True,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
