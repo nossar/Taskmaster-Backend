@@ -5,9 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "dj-database-url>=3.1.2",
     "django>=6.0.6",
+    "django-anymail>=15.0",
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.17.1",
     "djangorestframework-simplejwt>=5.5.1",
     "drf-spectacular>=0.29.0",
+    "pydantic-settings>=2.14.2",
+    "python-dotenv>=1.2.2",
 ]
