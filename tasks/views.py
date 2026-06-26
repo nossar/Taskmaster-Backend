@@ -118,16 +118,19 @@ class TaskListViewSet(viewsets.ModelViewSet):
         summary="Tarefas de hoje.",
         description="Lista as tarefas planejadas ou com prazo (due_date) para hoje.",
         tags=["Tarefas"],
+        responses=TaskSerializer(many=True),
     ),
     late=extend_schema(
         summary="Tarefas atrasadas.",
         description="Lista as tarefas pendentes com prazo (due_date) já vencido.",
         tags=["Tarefas"],
+        responses=TaskSerializer(many=True),
     ),
     completed=extend_schema(
         summary="Tarefas concluídas.",
         description="Lista as tarefas concluídas do usuário autenticado.",
         tags=["Tarefas"],
+        responses=TaskSerializer(many=True),
     ),
 )
 class TaskViewSet(viewsets.ModelViewSet):
