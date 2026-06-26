@@ -3,7 +3,7 @@ services:
     plan: free
     name: taskmaster-backend
     runtime: python
-    repo: https://https://github.com/nossar/Taskmaster-Backend.git
+    repo: https://github.com/nossar/Taskmaster-Backend.git
     buildCommand: "uv sync && uv run manage.py collectstatic --noinput && uv run manage.py migrate"
     startCommand: "uv run gunicorn trab2_web.asgi:application -k uvicorn.workers.UvicornWorker"
     envVars:
