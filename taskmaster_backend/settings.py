@@ -34,6 +34,7 @@ class AppSettings(BaseSettings):
     DEFAULT_FROM_EMAIL: str = "no-reply@taskmaster.local"
     RESEND_API_KEY: SecretStr | None = None
     CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=list)
+    CSRF_TRUSTED_ORIGINS: list[str] = Field(default_factory=list)
 
     model_config = SettingsConfigDict(env_file=".env")
 
@@ -168,9 +169,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
 }
 
 SPECTACULAR_SETTINGS = {
@@ -190,7 +189,7 @@ else:
             "CORS_ALLOWED_ORIGINS must be set when DEBUG is false."
         )
 
-CSRF_TRUSTED_ORIGINS = ["https://*.app.github.dev"]
+CSRF_TRUSTED_ORIGINS = config.CSRF_TRUSTED_ORIGINS or ["https://*.app.github.dev"]
 
 # E-mail (recuperação de senha)
 # https://docs.djangoproject.com/en/6.0/topics/email/
