@@ -20,6 +20,6 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: CORS_ALLOWED_ORIGINS
-        value: "[\"taskmaster-backend.onrender.com\", \"https://taskmaster-frontend.pages.dev\"]"
+        value: "[\"https://taskmaster-backend-2p03.onrender.com\", \"https://taskmaster-frontend.pages.dev\"]"
       - key: CSRF_TRUSTED_ORIGINS
         value: "[\"https://taskmaster-frontend.pages.dev\", \"https://taskmaster-backend.onrender.com\"]"
