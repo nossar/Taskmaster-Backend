@@ -1,8 +1,21 @@
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
+import datetime
 
-from .models import Task, TaskList
-from .serializers import TaskListSerializer, TaskSerializer
+from django.db.models import Count, Q
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema
+from rest_framework import filters, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .models import SubTask, Task, TaskList
+from .serializers import (
+    DashboardSummarySerializer,
+    SubTaskSerializer,
+    TaskListSerializer,
+    TaskSerializer,
+)
 
 
 class TaskListViewSet(viewsets.ModelViewSet):
@@ -14,9 +27,20 @@ class TaskListViewSet(viewsets.ModelViewSet):
     def get_queryset(self): #get_queryset é um método que retorna o conjunto de dados (queryset) que será usado para as operações do viewset. Aqui, ele filtra as listas de tarefas para incluir apenas aquelas pertencentes ao usuário autenticado, garantindo que cada usuário só veja suas próprias listas.
         if getattr(self, "swagger_fake_view", False): #caso a view seja uma visualização fake do Swagger (gerada para documentação), retorna um queryset vazio para evitar erros de serialização.
             return TaskList.objects.none()
-        return TaskList.objects.filter(user=self.request.user).order_by("name")
+        return (
+            TaskList.objects.filter(user=self.request.user)
+            .annotate(
+                pending_count=Count(
+                    "tasks",
+                    filter=Q(
+                        tasks__status__in=[Task.Status.PENDING, Task.Status.IN_PROGRESS]
+                    ),
+                )
+            )
+            .order_by("name")
+        )
 
-    def perform_create(self, serializer): 
+    def perform_create(self, serializer):
         #perform_create é um método que é chamado quando uma nova instância do modelo está sendo criada, chamado após a validação do serializer. Aqui, ele garante que o campo 'user' da TaskList seja automaticamente definido como o usuário autenticado, evitando que o usuário possa manipular esse campo no payload da requisição.
         serializer.save(user=self.request.user)
 
@@ -26,6 +50,15 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = [
+        "priority",
+        "status",
+        "due_date",
+        "planned_date",
+        "title",
+        "created_at",
+    ]
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
@@ -39,3 +72,140 @@ class TaskViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Owner não vem do payload para evitar manipulação.
         serializer.save(owner=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def toggle(self, request, pk=None):
+        """Alterna o status da tarefa entre concluída e pendente."""
+        task = self.get_object()
+        task.status = (
+            Task.Status.PENDING if task.status == Task.Status.DONE else Task.Status.DONE
+        )
+        task.save(update_fields=["status", "updated_at"])
+        serializer = self.get_serializer(task)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def today(self, request):
+        """Tarefas planejadas ou com prazo para hoje."""
+        today = timezone.localdate()
+        queryset = self.filter_queryset(
+            self.get_queryset().filter(Q(planned_date=today) | Q(due_date=today))
+        )
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def late(self, request):
+        """Tarefas pendentes com prazo (due_date) já vencido."""
+        today = timezone.localdate()
+        queryset = self.filter_queryset(
+            self.get_queryset().filter(
+                due_date__lt=today,
+                status__in=[Task.Status.PENDING, Task.Status.IN_PROGRESS],
+            )
+        )
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"])
+    def completed(self, request):
+        """Tarefas concluídas do usuário autenticado."""
+        queryset = self.filter_queryset(
+            self.get_queryset().filter(status=Task.Status.DONE)
+        )
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class SubTaskViewSet(viewsets.ModelViewSet):
+    """CRUD de subtarefas, restritas às tarefas do usuário autenticado."""
+
+    serializer_class = SubTaskSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return SubTask.objects.none()
+        return (
+            SubTask.objects.filter(task__task_list__user=self.request.user)
+            .select_related("task")
+            .order_by("task", "id")
+        )
+
+    @action(detail=True, methods=["post"])
+    def toggle(self, request, pk=None):
+        """Alterna a subtarefa entre feita e pendente."""
+        subtask = self.get_object()
+        subtask.done = not subtask.done
+        subtask.save(update_fields=["done"])
+        serializer = self.get_serializer(subtask)
+        return Response(serializer.data)
+
+
+class DashboardSummaryView(APIView):
+    """Contagens agregadas para o dashboard: pendentes, vencidas, hoje e concluídas na semana."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=DashboardSummarySerializer)
+    def get(self, request):
+        user = request.user
+        today = timezone.localdate()
+        week_start = today - datetime.timedelta(days=today.weekday())
+
+        base_qs = Task.objects.filter(task_list__user=user)
+        # Partimos do conjunto base de tasks pendentes para reaproveitar os mesmos filtros.
+        pending_qs = base_qs.filter(
+            status__in=[Task.Status.PENDING, Task.Status.IN_PROGRESS]
+        )
+
+        data = {
+            "pending": pending_qs.count(),
+            "overdue": pending_qs.filter(due_date__lt=today).count(),
+            "today": pending_qs.filter(
+                Q(planned_date=today) | Q(due_date=today)
+            ).count(),
+            "completed_week": base_qs.filter(
+                status=Task.Status.DONE, updated_at__date__gte=week_start
+            ).count(),
+        }
+        return Response(data)
+
+
+class DashboardUpcomingView(APIView):
+    """Tarefas vencidas, próximas do prazo e de alta prioridade para o dashboard."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=TaskSerializer(many=True))
+    def get(self, request):
+        user = request.user
+        today = timezone.localdate()
+
+        base_qs = Task.objects.filter(task_list__user=user).select_related(
+            "task_list", "owner"
+        )
+        pending_qs = base_qs.filter(
+            status__in=[Task.Status.PENDING, Task.Status.IN_PROGRESS]
+        )
+
+        overdue = pending_qs.filter(due_date__lt=today).order_by("due_date")
+        near_due = pending_qs.filter(
+            due_date__gte=today, due_date__lte=today + datetime.timedelta(days=7)
+        ).order_by("due_date")
+        high_priority = pending_qs.filter(priority=Task.Priority.HIGH).order_by(
+            "due_date"
+        )
+
+        seen_ids: set[int] = set()
+        upcoming: list[Task] = []
+        # As três listas podem se sobrepor; deduplicamos antes de limitar o painel.
+        for task in list(overdue) + list(near_due) + list(high_priority):
+            if task.pk not in seen_ids:
+                seen_ids.add(task.pk)
+                upcoming.append(task)
+
+        serializer = TaskSerializer(
+            upcoming[:10], many=True, context={"request": request}
+        )
+        return Response(serializer.data)
