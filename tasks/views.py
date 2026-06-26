@@ -2,7 +2,7 @@ import datetime
 
 from django.db.models import Count, Q
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -18,6 +18,38 @@ from .serializers import (
 )
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="Lista as listas de tarefas.",
+        description="Lista as listas de tarefas (TaskList) pertencentes ao usuário autenticado.",
+        tags=["Listas"],
+    ),
+    create=extend_schema(
+        summary="Cria uma lista de tarefas.",
+        description="Cria uma nova lista de tarefas (TaskList) para o usuário autenticado.",
+        tags=["Listas"],
+    ),
+    retrieve=extend_schema(
+        summary="Detalha uma lista de tarefas.",
+        description="Retorna os dados de uma lista de tarefas do usuário autenticado.",
+        tags=["Listas"],
+    ),
+    update=extend_schema(
+        summary="Atualiza uma lista de tarefas.",
+        description="Atualiza integralmente uma lista de tarefas do usuário autenticado.",
+        tags=["Listas"],
+    ),
+    partial_update=extend_schema(
+        summary="Atualiza parcialmente uma lista de tarefas.",
+        description="Atualiza parcialmente uma lista de tarefas do usuário autenticado.",
+        tags=["Listas"],
+    ),
+    destroy=extend_schema(
+        summary="Remove uma lista de tarefas.",
+        description="Remove uma lista de tarefas do usuário autenticado.",
+        tags=["Listas"],
+    ),
+)
 class TaskListViewSet(viewsets.ModelViewSet):
     """CRUD de listas de tarefas (TaskList) pertencentes ao usuário autenticado."""
 
@@ -45,6 +77,59 @@ class TaskListViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="Lista as tarefas.",
+        description="Lista as tarefas do usuário autenticado, ordenadas por status, prazo e título.",
+        tags=["Tarefas"],
+    ),
+    create=extend_schema(
+        summary="Cria uma tarefa.",
+        description="Cria uma nova tarefa vinculada a uma lista do usuário autenticado.",
+        tags=["Tarefas"],
+    ),
+    retrieve=extend_schema(
+        summary="Detalha uma tarefa.",
+        description="Retorna os dados de uma tarefa do usuário autenticado.",
+        tags=["Tarefas"],
+    ),
+    update=extend_schema(
+        summary="Atualiza uma tarefa.",
+        description="Atualiza integralmente uma tarefa do usuário autenticado.",
+        tags=["Tarefas"],
+    ),
+    partial_update=extend_schema(
+        summary="Atualiza parcialmente uma tarefa.",
+        description="Atualiza parcialmente uma tarefa do usuário autenticado.",
+        tags=["Tarefas"],
+    ),
+    destroy=extend_schema(
+        summary="Remove uma tarefa.",
+        description="Remove uma tarefa do usuário autenticado.",
+        tags=["Tarefas"],
+    ),
+    toggle=extend_schema(
+        summary="Alterna status da tarefa.",
+        description="Alterna o status da tarefa entre concluída e pendente.",
+        tags=["Tarefas"],
+        request=None,
+    ),
+    today=extend_schema(
+        summary="Tarefas de hoje.",
+        description="Lista as tarefas planejadas ou com prazo (due_date) para hoje.",
+        tags=["Tarefas"],
+    ),
+    late=extend_schema(
+        summary="Tarefas atrasadas.",
+        description="Lista as tarefas pendentes com prazo (due_date) já vencido.",
+        tags=["Tarefas"],
+    ),
+    completed=extend_schema(
+        summary="Tarefas concluídas.",
+        description="Lista as tarefas concluídas do usuário autenticado.",
+        tags=["Tarefas"],
+    ),
+)
 class TaskViewSet(viewsets.ModelViewSet):
     """CRUD de tarefas, restritas ao usuário autenticado."""
 
@@ -117,6 +202,44 @@ class TaskViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="Lista as subtarefas.",
+        description="Lista as subtarefas vinculadas às tarefas do usuário autenticado.",
+        tags=["Subtarefas"],
+    ),
+    create=extend_schema(
+        summary="Cria uma subtarefa.",
+        description="Cria uma nova subtarefa vinculada a uma tarefa do usuário autenticado.",
+        tags=["Subtarefas"],
+    ),
+    retrieve=extend_schema(
+        summary="Detalha uma subtarefa.",
+        description="Retorna os dados de uma subtarefa do usuário autenticado.",
+        tags=["Subtarefas"],
+    ),
+    update=extend_schema(
+        summary="Atualiza uma subtarefa.",
+        description="Atualiza integralmente uma subtarefa do usuário autenticado.",
+        tags=["Subtarefas"],
+    ),
+    partial_update=extend_schema(
+        summary="Atualiza parcialmente uma subtarefa.",
+        description="Atualiza parcialmente uma subtarefa do usuário autenticado.",
+        tags=["Subtarefas"],
+    ),
+    destroy=extend_schema(
+        summary="Remove uma subtarefa.",
+        description="Remove uma subtarefa do usuário autenticado.",
+        tags=["Subtarefas"],
+    ),
+    toggle=extend_schema(
+        summary="Alterna status da subtarefa.",
+        description="Alterna a subtarefa entre feita e pendente.",
+        tags=["Subtarefas"],
+        request=None,
+    ),
+)
 class SubTaskViewSet(viewsets.ModelViewSet):
     """CRUD de subtarefas, restritas às tarefas do usuário autenticado."""
 
@@ -147,7 +270,12 @@ class DashboardSummaryView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses=DashboardSummarySerializer)
+    @extend_schema(
+        summary="Resumo do dashboard.",
+        description="Contagens agregadas para o dashboard: pendentes, vencidas, hoje e concluídas na semana.",
+        tags=["Dashboard"],
+        responses=DashboardSummarySerializer,
+    )
     def get(self, request):
         user = request.user
         today = timezone.localdate()
@@ -177,7 +305,12 @@ class DashboardUpcomingView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses=TaskSerializer(many=True))
+    @extend_schema(
+        summary="Próximas tarefas do dashboard.",
+        description="Tarefas vencidas, próximas do prazo (7 dias) e de alta prioridade para o dashboard.",
+        tags=["Dashboard"],
+        responses=TaskSerializer(many=True),
+    )
     def get(self, request):
         user = request.user
         today = timezone.localdate()
