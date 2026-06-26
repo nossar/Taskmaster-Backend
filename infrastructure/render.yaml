@@ -5,7 +5,7 @@ services:
     runtime: python
     repo: https://github.com/nossar/Taskmaster-Backend.git
     buildCommand: "uv sync && uv run manage.py collectstatic --noinput && uv run manage.py migrate"
-    startCommand: "uv run gunicorn trab2_web.asgi:application -k uvicorn.workers.UvicornWorker"
+    startCommand: "uv run gunicorn taskmaster_backend.asgi:application -k uvicorn.workers.UvicornWorker"
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -16,4 +16,6 @@ services:
       - key: DEFAULT_FROM_EMAIL
         sync: false
       - key: RESEND_API_KEY
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
         sync: false
