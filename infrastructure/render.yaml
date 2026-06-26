@@ -10,7 +10,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS
-        value: "[\"taskmaster-backend.onrender.com\"]"
+        value: "[\"taskmaster-backend-2p03.onrender.com\"]"
       - key: DATABASE_URL
         sync: false
       - key: DEFAULT_FROM_EMAIL
