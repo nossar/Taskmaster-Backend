@@ -26,8 +26,8 @@ Este backend **não contém códigos HTML, CSS ou JavaScript**, sendo projetado 
 
 * **Repositório do Frontend**: https://github.com/luizfneves404/taskmaster-frontend
 * **Repositório do Backend**: https://github.com/nossar/Taskmaster-Backend
-* **Site Publicado (Frontend)**: https://taskmaster-frontend.pages.dev
-* **Site Publicado (Backend/API)**: https://taskmaster-backend-2p03.onrender.com
+* **Site Publicado (Frontend) no Cloudflare Pages**: https://taskmaster-frontend.pages.dev
+* **Site Publicado (Backend/API) no Render**: https://taskmaster-backend-2p03.onrender.com
 
 ---
 
