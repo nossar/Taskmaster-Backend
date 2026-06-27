@@ -1,7 +1,7 @@
-# Trabalho 2 — API Backend do Taskmaster (INF1407)
+# API Backend do Taskmaster (INF1407)
 
 ## Integrantes do Grupo
-* **Luiz Felipe Neves**: — *2311024*
+* **Luiz Felipe Neves**: — 2311024
 * **Matheus Nossar**: — 2311213
 
 ---
@@ -165,7 +165,7 @@ A API do **Taskmaster** é totalmente documentada pelo Swagger. Abaixo está o r
 
 ---
 
-## 📈 Relato de Testes (O que Funcionou / O que Não Funcionou)
+## 📈 Relato de Testes (O que Funcionou)
 
 Para garantir a confiabilidade e robustez de todas as implementações exigidas no trabalho, foi desenvolvido um conjunto rigoroso de **51 testes automatizados**, abrangendo cenários de sucesso, falha e regras de segurança.
 
